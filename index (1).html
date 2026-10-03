@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PM2.5 ทำนายล่วงหน้า รายสถานี</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      :root {
+        --ink: #16231d;
+        --mut: #66736c;
+        --line: #e3e8e4;
+        --brand: #1b7a3d;
+      }
+      body {
+        margin: 0;
+        background: #f1f4f1;
+        font-family: "Sarabun", "Noto Sans Thai", system-ui, sans-serif;
+        color: var(--ink);
+      }
+      .top {
+        background: linear-gradient(120deg, #0f3d26, #1b7a3d);
+        color: #fff;
+        padding: 18px 20px;
+      }
+      .top h1 {
+        margin: 0;
+        font-size: 22px;
+      }
+      .top p {
+        margin: 4px 0 0;
+        font-size: 13px;
+        opacity: 0.85;
+      }
+      .wrap {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 16px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 320px;
+        gap: 16px;
+        align-items: start;
+      }
+      .card {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 16px;
+        box-shadow: 0 1px 3px #0001;
+      }
+      aside .card {
+        margin-bottom: 14px;
+      }
+      aside .card:last-child {
+        margin-bottom: 0;
+      }
+      h3 {
+        font-size: 13px;
+        margin: 0 0 10px;
+        color: var(--mut);
+        font-weight: 600;
+        letter-spacing: 0.2px;
+      }
+      h3:not(:first-child) {
+        margin-top: 16px;
+      }
+      .mapwrap {
+        position: relative;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+      }
+      #map {
+        height: calc(100vh - 230px);
+        min-height: 480px;
+        max-height: 720px;
+        background: #dfe6e0;
+      }
+      .tools {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 1000;
+        display: flex;
+        gap: 6px;
+        background: #fff;
+        padding: 5px;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px #0003;
+      }
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .chip {
+        border: 1px solid var(--line);
+        background: #fff;
+        border-radius: 10px;
+        padding: 6px 12px;
+        font: inherit;
+        font-size: 13px;
+        cursor: pointer;
+        color: var(--ink);
+        transition: 0.15s;
+      }
+      .chip:hover {
+        border-color: var(--brand);
+      }
+      .chip.on {
+        background: var(--brand);
+        color: #fff;
+        border-color: var(--brand);
+      }
+      .timebar {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        margin-top: 12px;
+        font-size: 14px;
+      }
+      .timebar input {
+        flex: 1;
+        accent-color: var(--brand);
+      }
+      #play {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        border: 0;
+        background: var(--brand);
+        color: #fff;
+        cursor: pointer;
+        font-size: 13px;
+      }
+      .lbl {
+        min-width: 76px;
+        color: var(--mut);
+      }
+      .val {
+        min-width: 150px;
+        font-weight: 700;
+      }
+      #legend div {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 13px;
+        margin: 6px 0;
+      }
+      #legend i {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        box-shadow:
+          0 0 0 2px #fff,
+          0 0 0 3px #0002;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      th {
+        text-align: right;
+        padding: 6px 4px;
+        color: var(--mut);
+        font-weight: 600;
+        border-bottom: 1px solid var(--line);
+      }
+      td {
+        text-align: right;
+        padding: 8px 4px;
+        border-bottom: 1px solid #f0f2f0;
+        font-variant-numeric: tabular-nums;
+      }
+      th:first-child,
+      td:first-child {
+        text-align: left;
+        font-weight: 700;
+      }
+      .pin {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        border: 3px solid #fff;
+        box-shadow: 0 2px 8px #0006;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 14px;
+        cursor: pointer;
+        transition: transform 0.15s;
+      }
+      .pin:hover {
+        transform: scale(1.12);
+      }
+      .plabel {
+        margin: 3px auto 0;
+        width: max-content;
+        background: #fff;
+        border-radius: 6px;
+        padding: 0 6px;
+        font-size: 11px;
+        font-weight: 700;
+        box-shadow: 0 1px 3px #0004;
+      }
+      .pop {
+        position: absolute;
+        z-index: 1100;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: min(520px, 92%);
+        background: #fff;
+        border-radius: 16px;
+        box-shadow: 0 12px 40px #0005;
+        padding: 16px;
+      }
+      .pop h3 {
+        margin: 0 0 8px;
+        font-size: 17px;
+        color: var(--ink);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .pop .x {
+        border: 0;
+        background: #eef1ee;
+        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        font-size: 18px;
+        cursor: pointer;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 14px;
+        align-items: center;
+        margin: 8px 0;
+        font-size: 13px;
+      }
+      .pop .chart {
+        height: 250px;
+      }
+      .stat {
+        font-size: 12px;
+        color: var(--mut);
+        margin-top: 6px;
+      }
+      select {
+        padding: 5px 8px;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        font: inherit;
+      }
+      .leaflet-container {
+        font-family: inherit;
+      }
+      @media (max-width: 900px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+        #map {
+          height: 60vh;
+        }
+      }
+      @media (max-width: 600px) {
+        .wrap {
+          padding: 10px;
+        }
+        .top {
+          padding: 14px;
+        }
+        .top h1 {
+          font-size: 19px;
+        }
+        .timebar {
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+        .lbl {
+          min-width: 0;
+        }
+        .val {
+          min-width: 0;
+        }
+        .timebar input {
+          flex-basis: 100%;
+        }
+        .pop {
+          padding: 12px;
+        }
+        .pop .chart {
+          height: 220px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="top">
+      <h1>
+        การประยุกต์ใช้โมเดล Long Short-Term Memory (LSTM)
+        สำหรับพยากรณ์ค่าฝุ่นละอองขนาดเล็ก PM2.5 ล่วงหน้า 12 ชั่วโมง
+      </h1>
+      <p>
+        ผลการพยากรณ์จากโมเดล LSTM ของกลุ่ม group_5norain_bp
+        (ไม่ใช้ข้อมูลปริมาณน้ำฝนและความกดอากาศ) สำหรับสถานีทดสอบ 4 แห่ง ได้แก่
+        70t, 73t, 97t และ 98t
+      </p>
+    </div>
+    <div class="wrap">
+      <div class="grid">
+        <div class="card">
+          <div class="mapwrap">
+            <div id="map"></div>
+            <div id="pop" class="pop" hidden></div>
+          </div>
+          <div class="timebar">
+            <span class="lbl">รอบพยากรณ์</span><b id="oLabel" class="val"></b
+            ><input type="range" id="oSlider" />
+          </div>
+          <div class="timebar">
+            <button id="play">▶</button><span class="lbl">ล่วงหน้า</span
+            ><b id="tLabel" class="val"></b><input type="range" id="slider" />
+          </div>
+        </div>
+        <aside>
+          <div class="card">
+            <h3>ค่าที่ใช้ระบายสี</h3>
+            <div id="bChips" class="chips"></div>
+          </div>
+          <div class="card">
+            <h3>เกณฑ์สี PM2.5 (µg/m³)</h3>
+            <div id="legend"></div>
+          </div>
+          <div class="card">
+            <h3>สรุปทุกสถานี</h3>
+            <table id="tbl"></table>
+          </div>
+        </aside>
+      </div>
+    </div>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="data.js"></script>
+    <script src="geo.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
